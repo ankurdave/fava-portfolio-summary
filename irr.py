@@ -303,12 +303,8 @@ class IRR:
             # cashflows and subtract them out. This will leave a net $0
             # if all the cashflows are internal.
             for posting in entry.postings:
-                # convert_position uses the price-map to do price conversions, but this does not necessarily
-                # accurately represent the cost at transaction time (due to intra-day variations).  That
-                # could cause inacuracy, but since the cashflow is applied to the daily balance, it is more
-                # important to be consistent with values
-                converted = beancount.core.convert.convert_position(
-                    posting, self.currency, self.price_map, entry.date)
+                converted = beancount.core.convert.convert_amount(
+                    beancount.core.convert.get_weight(posting), self.currency, self.price_map, entry.date)
                 if converted.currency != self.currency:
                     # If the price_map does not contain a valid price, see if it can be calculated from cost
                     # This must align with get_value_as_of()
