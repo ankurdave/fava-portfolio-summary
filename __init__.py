@@ -31,6 +31,10 @@ from fava.context import g
 from .irr import IRR
 
 
+def cashflows_to_cost(cashflows):
+    return round(sum([amount for date, amount in cashflows[:-1]]), 2)
+
+
 class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
     """Report out summary information for groups of portfolios"""
 
@@ -105,8 +109,9 @@ class PortfolioSummaryInstance:  # pragma: no cover
                                      (float(self.total['cost'])+.00001)) * 100, 2)
         self.total['pnl'] = round(float(self.total['balance'] - self.total['cost']), 2)
         if 'mwr' in seen_cols or 'twr' in seen_cols:
-            self.total['mwr'], self.total['twr'] = self._calculate_irr_twr(
+            self.total['mwr'], self.total['twr'], cashflows = self._calculate_irr_twr(
                 self.all_mwr_accounts, all_mwr_internal, 'mwr' in seen_cols, 'twr' in seen_cols)
+            self.total['cost'] = cashflows_to_cost(cashflows)
 
         portfolios = [("All portfolios", (self._get_types(cols), [self.total]))] + portfolios
         print(f"Done: Elapsed: {time.time() - _t0:.2f} (mwr/twr: {self.irr.elapsed():.2f}, "
@@ -351,8 +356,9 @@ class PortfolioSummaryInstance:  # pragma: no cover
                 parent['cost'] += row['cost']
                 parent['dividends'] += row['dividends']
                 if mwr == "children" or twr == "children":
-                    row['mwr'], row['twr'] = self._calculate_irr_twr(
+                    row['mwr'], row['twr'], cashflows = self._calculate_irr_twr(
                         [row['account']], internal, mwr == "children", twr == "children")
+                    row['cost'] = cashflows_to_cost(cashflows)
                 parent['children'].append(row)
                 rows.append(row)
             total['balance'] += parent['balance']
@@ -361,7 +367,8 @@ class PortfolioSummaryInstance:  # pragma: no cover
             if mwr or twr:
                 pattern = parent['account'] + '(:.*)?'
                 mwr_accounts.add(pattern)
-                parent['mwr'], parent['twr'] = self._calculate_irr_twr([pattern], internal, mwr, twr)
+                parent['mwr'], parent['twr'], cashflows = self._calculate_irr_twr([pattern], internal, mwr, twr)
+                parent['cost'] = cashflows_to_cost(cashflows)
 
         for row in rows:
             if "balance" in row and total['balance'] > 0:
@@ -372,7 +379,8 @@ class PortfolioSummaryInstance:  # pragma: no cover
         self.total['cost'] += total['cost']
         self.total['dividends'] += total['dividends']
         if mwr or twr:
-            total['mwr'], total['twr'] = self._calculate_irr_twr(mwr_accounts, internal, mwr, twr)
+            total['mwr'], total['twr'], cashflows = self._calculate_irr_twr(mwr_accounts, internal, mwr, twr)
+            total['cost'] = cashflows_to_cost(cashflows)
             self.all_mwr_accounts |= mwr_accounts
         return total
 
@@ -380,13 +388,13 @@ class PortfolioSummaryInstance:  # pragma: no cover
         cache_key = (",".join(patterns), ",".join(internal), self.ledger.end_date, calc_mwr, calc_twr)
         if cache_key in self.irr_cache:
             return self.irr_cache[cache_key]
-        mwr, twr = self.irr.calculate(
+        mwr, twr, cashflows = self.irr.calculate(
             patterns, internal_patterns=internal,
             start_date=None, end_date=self.ledger.end_date, mwr=calc_mwr, twr=calc_twr)
         if mwr:
             mwr = round(100 * mwr, 2)
         if twr:
             twr = round(100 * twr, 2)
-        self.irr_cache[cache_key] = [mwr, twr]
+        self.irr_cache[cache_key] = [mwr, twr, cashflows]
         print(f'mwr: {mwr} twr: {twr}')
-        return mwr, twr
+        return mwr, twr, cashflows

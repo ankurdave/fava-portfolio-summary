@@ -247,6 +247,8 @@ class IRR:
                   debug_twr=False):
         """Calulate MWRR or TWRR for a set of accounts"""
         ## pylint: disable=too-many-branches too-many-statements too-many-locals too-many-arguments
+        print(f'Cashflows for {patterns}')
+
         self.interesting.clear()
         self.internal.clear()
         self.inventory.clear()
@@ -333,6 +335,7 @@ class IRR:
             # calculate net cashflow & the date
             if cashflow.quantize(Decimal('.01')) != 0:
                 cashflows.append((entry.date, cashflow))
+                print(f'({entry.date}, {cashflow}): {entry}')
                 if twr:
                     if entry.date not in twrr_periods:
                         twrr_periods[entry.date] = [self.get_value_as_of(None, entry.date), 0]
@@ -373,7 +376,7 @@ class IRR:
             delta = elapsed[i+1] - elapsed[i]
             self.times[i] += delta
             # print(f"T{i}: delta")
-        return irr, twrr
+        return irr, twrr, cashflows
 
 def main():
     """Entrypoint"""
